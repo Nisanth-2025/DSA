@@ -1,0 +1,75 @@
+name: Java CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build and Test Java Files
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        java-version: [17, 21]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+
+      - name: Cache Java dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Find and compile all Java files
+        run: |
+          echo "🔍 Finding Java files..."
+          java_files=$(find . -name "*.java" -type f | wc -l)
+          echo "📁 Found $java_files Java files"
+          
+          if [ $java_files -eq 0 ]; then
+            echo "⚠️  No Java files found to compile"
+            exit 0
+          fi
+          
+          echo "🔨 Starting compilation..."
+          compilation_errors=0
+          
+          find . -name "*.java" -type f | while read -r file; do
+            echo "📝 Compiling: $file"
+            if javac "$file"; then
+              echo "✅ Successfully compiled: $file"
+            else
+              echo "❌ Failed to compile: $file"
+              compilation_errors=$((compilation_errors + 1))
+            fi
+          done
+          
+          echo "🎉 Compilation process completed!"
+
+      - name: Check for class files
+        run: |
+          class_files=$(find . -name "*.class" -type f | wc -l)
+          echo "🔍 Generated $class_files .class files"
+          
+          if [ $class_files -gt 0 ]; then
+            echo "📋 List of compiled classes:"
+            find . -name "*.class" -type f | head -10
+          fi
+
+      - name: Clean up compiled files
+        run: |
+          echo "🧹 Cleaning up .class files..."
+          find . -name "*.class" -type f -delete
+          echo "✨ Cleanup completed!"
